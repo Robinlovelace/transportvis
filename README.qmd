@@ -1,0 +1,62 @@
+---
+format: gfm
+echo: false
+---
+
+```{r}
+#| include=FALSE
+library(tidyverse)
+```
+
+```{r}
+# Basic transport colours
+mode_cols = c(
+  car = "#fe5f55",
+  other = "#BEBEBE",
+  public = "#ffd166",
+  bike = "#90be6d",
+  walk = "#457b9d"
+  )
+mode_cols_list = as.list(mode_cols)
+# colorspace::demoplot(rev(mode_cols), type = "bar")
+# plot(names(mode_cols), 1:length(mode_cols))
+mode_cols_df = tibble(
+  modes = factor(names(mode_cols), ordered = TRUE, levels = names(mode_cols)),
+  colors = mode_cols, n = 2:6
+  )
+ggplot(mode_cols_df) +
+  geom_bar(aes(rev(modes), n, fill = modes), stat = "identity") +
+  scale_fill_manual(values = mode_cols_df$colors) +
+  coord_flip() +
+  theme_void()
+
+#' Function to extract transportvis colors as hex codes
+#'
+#' @param ... Character names of transportvis_colors 
+#'
+transportvis_cols <- function(...) {
+  cols <- c(...)
+
+  if (is.null(cols))
+    return (mode_cols)
+
+  mode_cols[cols]
+}
+
+
+# transportvis_cols()
+
+# transportvis_cols("car")
+# transportvis_cols("car", "bike")
+
+
+# Like all great organisations, transportvis Inc has a few main colors (let’s say blue, green, and yellow), but the full list (above) includes other official colors used for a variety of purposes. So we can now create palettes (various combinations) of these colors. Similar to how we deal with colors, first define a list like such:
+
+transportvis_palettes <- list(
+  `main`  = as.list(transportvis_cols()),
+  `no_transit`  = as.list(transportvis_cols("walk", "bike", "other")),
+  `no_other`   = as.list(transportvis_cols("walk", "bike", "public"))
+)
+json = jsonlite::toJSON(transportvis_palettes, pretty = TRUE, keep_vec_names = TRUE)
+jsonlite::write_json(transportvis_palettes, pretty = TRUE, "mode_pallette.json")
+```
