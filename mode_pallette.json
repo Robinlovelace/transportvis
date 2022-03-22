@@ -1,10 +1,17 @@
 {
-  "main": {
+  "full": {
     "car": ["#fe5f55"],
     "other": ["#BEBEBE"],
     "public": ["#ffd166"],
+    "ebike": ["#A9C26B"],
     "bike": ["#90be6d"],
     "walk": ["#457b9d"]
+  },
+  "main": {
+    "walk": ["#457b9d"],
+    "bike": ["#90be6d"],
+    "other": ["#BEBEBE"],
+    "car": ["#fe5f55"]
   },
   "no_transit": {
     "walk": ["#457b9d"],

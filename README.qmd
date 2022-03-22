@@ -1,5 +1,5 @@
 ---
-format: gfm
+# format: gfm
 echo: false
 ---
 
@@ -14,15 +14,17 @@ mode_cols = c(
   car = "#fe5f55",
   other = "#BEBEBE",
   public = "#ffd166",
+  ebike = "#A9C26B",
   bike = "#90be6d",
   walk = "#457b9d"
   )
 mode_cols_list = as.list(mode_cols)
+as_mode = function(x) factor(x, ordered = TRUE, levels = x)
 # colorspace::demoplot(rev(mode_cols), type = "bar")
 # plot(names(mode_cols), 1:length(mode_cols))
 mode_cols_df = tibble(
-  modes = factor(names(mode_cols), ordered = TRUE, levels = names(mode_cols)),
-  colors = mode_cols, n = 2:6
+  modes = as_mode(names(mode_cols)),
+  colors = mode_cols, n = 2:7
   )
 ggplot(mode_cols_df) +
   geom_bar(aes(rev(modes), n, fill = modes), stat = "identity") +
@@ -34,7 +36,7 @@ ggplot(mode_cols_df) +
 #'
 #' @param ... Character names of transportvis_colors 
 #'
-transportvis_cols <- function(...) {
+transportvis_cols = function(...) {
   cols <- c(...)
 
   if (is.null(cols))
@@ -53,10 +55,112 @@ transportvis_cols <- function(...) {
 # Like all great organisations, transportvis Inc has a few main colors (let’s say blue, green, and yellow), but the full list (above) includes other official colors used for a variety of purposes. So we can now create palettes (various combinations) of these colors. Similar to how we deal with colors, first define a list like such:
 
 transportvis_palettes <- list(
-  `main`  = as.list(transportvis_cols()),
-  `no_transit`  = as.list(transportvis_cols("walk", "bike", "other")),
-  `no_other`   = as.list(transportvis_cols("walk", "bike", "public"))
+  `full`  = transportvis_cols(),
+  `main`  = transportvis_cols("walk", "bike", "other", "car"),
+  `no_transit`  = transportvis_cols("walk", "bike", "other"),
+  `no_other`   = transportvis_cols("walk", "bike", "public")
 )
-json = jsonlite::toJSON(transportvis_palettes, pretty = TRUE, keep_vec_names = TRUE)
-jsonlite::write_json(transportvis_palettes, pretty = TRUE, "mode_pallette.json")
+transportvis_list = lapply(transportvis_palettes, as.list)
+json = jsonlite::toJSON(transportvis_list, pretty = TRUE, keep_vec_names = TRUE)
+json
+jsonlite::write_json(transportvis_list, pretty = TRUE, "mode_pallette.json")
 ```
+
+```{r}
+transportvis_pal <- function(palette = "full", reverse = FALSE, ...) {
+  pal <- transportvis_palettes[[palette]]
+
+  if (reverse) pal <- rev(pal)
+
+  colorRampPalette(pal, ...)
+}
+
+# transportvis_pal("no_other")
+# transportvis_pal("no_other")(10)
+
+#' Color scale constructor for transportvis colors
+#'
+#' @param palette Character name of palette in transportvis_palettes
+#' @param discrete Boolean indicating whether color aesthetic is discrete or not
+#' @param reverse Boolean indicating whether the palette should be reversed
+#' @param ... Additional arguments passed to discrete_scale() or
+#'            scale_color_gradientn(), used respectively when discrete is TRUE or FALSE
+#'
+scale_color_transportvis <- function(palette = "full", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- transportvis_pal(palette = palette, reverse = reverse)
+
+  if (discrete) {
+    discrete_scale("colour", paste0("transportvis_", palette), palette = pal, ...)
+  } else {
+    scale_color_gradientn(colours = pal(256), ...)
+  }
+}
+
+#' Fill scale constructor for transportvis colors
+#'
+#' @param palette Character name of palette in transportvis_palettes
+#' @param discrete Boolean indicating whether color aesthetic is discrete or not
+#' @param reverse Boolean indicating whether the palette should be reversed
+#' @param ... Additional arguments passed to discrete_scale() or
+#'            scale_fill_gradientn(), used respectively when discrete is TRUE or FALSE
+#'
+scale_fill_transportvis <- function(palette = "full", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- transportvis_pal(palette = palette, reverse = reverse)
+
+  if (discrete) {
+    discrete_scale("fill", paste0("transportvis_", palette), palette = pal, ...)
+  } else {
+    scale_fill_gradientn(colours = pal(256), ...)
+  }
+}
+
+# Each of these functions specifies a palette, whether the palette is being applied based on a discrete or numeric variable, whether to reverse the palette colors, and additional arguments to pass to the relevant ggplot2 function (which differs for discrete or numeric mapping).
+
+# Let’s see them in action.
+
+# Color by discrete variable using default palette
+# ggplot(iris, aes(Sepal.Width, Sepal.Length, color = Species)) +
+#     geom_point(size = 4) +
+#     scale_color_transportvis()
+
+```
+
+```{r}
+# Color by numeric variable with cool palette
+ggplot(iris, aes(Sepal.Width, Sepal.Length, color = Sepal.Length)) +
+    geom_point(size = 4, alpha = .6) +
+    scale_color_transportvis(discrete = FALSE, palette = "no_transit")
+
+# Fill by discrete variable with different palette + remove legend (guide)
+
+```
+
+Using linear interpolation the palette can be expanded to cover many modes.
+Following the example from Simon, we can create plot of car manufacturers with colors adjusting between the main colours as follows.
+
+```{r}
+ggplot(mpg, aes(manufacturer, fill = manufacturer)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_fill_transportvis(palette = "main", guide = "none")
+```
+
+Although the figure is not supposed to be realistic (are Volkswagens really closer to walking than Audis?!) it highlights an important point: mode of transport can be seen as a continuous variable from high speed/weight/power to active modes such as walking.
+An electric cargo bike is somewhere between a 'normal' bike and public/private transport options.
+Thus we can expand the palette:
+
+```{r}
+full_transport_cols = transportvis_pal("no_other")(14)
+ebike_colour = full_transport_cols[9]
+
+mode_df = tibble(
+  mode = as_mode(c("car", "other", "public", "ebike", "bike", "walk")),
+  n = c(car = 100, other = 5, public = 10, ebike = 2, bike = 4, walk = 30)
+)
+mode_df %>% 
+  ggplot() +
+  geom_bar(aes(mode, n, fill = mode), stat = "identity") +
+  scale_fill_transportvis()
+```
+
+The above shows the importance of selecting good colours for modes.
